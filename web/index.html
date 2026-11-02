@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>mania-overlay</title>
+  <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+  <div id="grid"></div>
+  <div id="stage"></div>
+  <div id="edit-hint">Edit mode — drag widgets to move, scroll on a widget to resize, Shift disables snapping, Esc to finish</div>
+  <div id="conn"></div>
+  <div id="toasts"></div>
+
+  <div id="ratemenu" class="ui" hidden>
+    <div class="rm-box" role="dialog" aria-label="Rate changer">
+      <div class="rm-head">
+        <span class="brand">Rate changer</span>
+        <span id="rm-map" class="muted">—</span>
+      </div>
+      <div class="rm-value">
+        <button id="rm-minus" type="button" aria-label="Lower rate">−</button>
+        <label class="rm-num"><input id="rm-input" type="text" inputmode="decimal" maxlength="5" autocomplete="off" spellcheck="false" aria-label="Rate"><span>x</span></label>
+        <button id="rm-plus" type="button" aria-label="Raise rate">+</button>
+      </div>
+      <input id="rm-slider" type="range" min="0.5" max="2" step="0.01" aria-label="Rate">
+      <div class="rm-scale"><span>0.5x</span><span>1.0x</span><span>1.5x</span><span>2.0x</span></div>
+      <div id="rm-chips" class="chips"></div>
+      <div class="rm-od" id="rm-od-box">
+        <label class="rm-od-toggle"><input id="rm-od-on" type="checkbox"> Change OD <span id="rm-od-orig" class="muted"></span></label>
+        <div class="rm-od-ctl">
+          <button id="rm-od-minus" type="button" aria-label="Lower OD">−</button>
+          <label class="rm-od-num">OD <input id="rm-od" type="text" inputmode="decimal" maxlength="4" autocomplete="off" spellcheck="false" aria-label="OD"></label>
+          <button id="rm-od-plus" type="button" aria-label="Raise OD">+</button>
+          <input id="rm-od-slider" type="range" min="0" max="10" step="0.1" aria-label="OD">
+        </div>
+      </div>
+      <label class="rm-pitch"><input id="rm-pitch" type="checkbox"> Change pitch (nightcore style)</label>
+      <div class="rm-actions">
+        <button id="rm-create" type="button" class="primary">Create</button>
+        <button id="rm-cancel" type="button">Close</button>
+      </div>
+      <div id="rm-status" class="small"></div>
+      <div class="rm-keys small muted">Type a rate · ↑ ↓ ±0.05 · Shift ±0.01 · Tab to OD · Enter create · Esc close</div>
+    </div>
+  </div>
+
+  <div id="panel" class="ui" hidden>
+    <header id="panel-head">
+      <span class="brand">mania-overlay</span>
+      <nav id="tabs">
+        <button data-tab="widgets" class="on">Widgets</button>
+        <button data-tab="rate">Rate changer</button>
+        <button data-tab="look">Look</button>
+        <button data-tab="general">General</button>
+      </nav>
+      <button id="done" class="primary">Done</button>
+    </header>
+    <section id="tab-widgets" class="tab"></section>
+    <section id="tab-rate" class="tab" hidden>
+      <div class="map-line"><span class="muted">Selected map</span><div id="rate-map">—</div></div>
+      <div class="row">
+        <label>Rate <input id="rate-input" type="number" min="0.5" max="3" step="0.05" value="1.1"></label>
+        <label>OD <input id="rate-od" type="text" inputmode="decimal" maxlength="4" placeholder="keep" title="Leave empty to keep the map's OD"></label>
+        <button id="rate-one" class="primary">Create</button>
+      </div>
+      <div class="muted small">Or pick several:</div>
+      <div id="rate-quick" class="chips"></div>
+      <div class="row">
+        <button id="rate-many">Create selected</button>
+        <button id="rate-clear">Clear</button>
+      </div>
+      <div class="opts">
+        <label><input id="rate-pitch" type="checkbox"> Change pitch (nightcore style)</label>
+        <label><input id="rate-overwrite" type="checkbox"> Overwrite existing rates</label>
+        <label>Audio format
+          <select id="rate-format"><option value="ogg">ogg (recommended)</option><option value="mp3">mp3</option></select>
+        </label>
+      </div>
+      <pre id="rate-log"></pre>
+      <div class="muted small">Have the map selected in song select. New difficulties appear in the same mapset; press F5 in song select if they don't show up.</div>
+    </section>
+    <section id="tab-look" class="tab" hidden></section>
+    <section id="tab-general" class="tab" hidden></section>
+  </div>
+
+  <script src="overlay.js"></script>
+</body>
+</html>

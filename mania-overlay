@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Launcher: runs the mania_overlay package that lives next to this script.
+here="$(dirname "$(readlink -f "$0")")"
+export PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m mania_overlay "$@"
