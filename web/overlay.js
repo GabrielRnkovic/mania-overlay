@@ -95,38 +95,86 @@ function odWindows(od) {
 }
 
 // ------------------------------------------------------------------ widget definitions
+const JROWS = [
+  { k: 'max', word: 'marv', num: 'MAX' },
+  { k: '300', word: 'perf', num: '300' },
+  { k: '200', word: 'great', num: '200' },
+  { k: '100', word: 'good', num: '100' },
+  { k: '50', word: 'bad', num: '50' },
+  { k: 'miss', word: 'miss', num: 'MISS' },
+];
 const WIDGETS = {
   judgements: {
     label: 'Judgements',
+    // Look based on breadles5's "Mania Hit Count and Chart" tosu counter:
+    // a doughnut chart of the judgement split next to coloured labels and counts.
     options: [
-      { key: 'layout', type: 'select', label: 'Layout', choices: [['rows', 'Rows'], ['compact', 'One line']] },
+      { key: 'layout', type: 'select', label: 'Layout', choices: [['chart', 'Chart + counts'], ['counts', 'Counts only'], ['compact', 'One line']] },
+      { key: 'labels', type: 'select', label: 'Labels', choices: [['words', 'marv / perf / great…'], ['numbers', 'MAX / 300 / 200…']] },
+      { key: 'roundFont', type: 'bool', label: 'Rounded font' },
       { key: 'showRatios', type: 'bool', label: 'MA / PA ratios' },
       { key: 'showBadge', type: 'bool', label: 'MA / PFC / FC badge' },
     ],
     render(root, cfg, d) {
       const results = stateNum(d) === ST.results && d.resultsScreen;
       const h = hitsOf(results ? d.resultsScreen : d.play);
-      const rows = [['max', 'MAX'], ['300', '300'], ['200', '200'], ['100', '100'], ['50', '50'], ['miss', 'MISS']];
-      let html = '';
-      if (cfg.layout === 'compact') {
-        html = `<div class="judge-line">${rows.map(([k]) => `<span class="j-${k}">${h[k]}</span>`).join('<span class="muted">/</span>')}</div>`;
-      } else {
-        html = `<div class="judge-rows">${rows.map(([k, l]) => `<span class="lbl j-${k}">${l}</span><span class="val j-${k}">${h[k]}</span>`).join('')}</div>`;
+      const layout = cfg.layout === 'rows' ? 'counts' : (cfg.layout || 'chart');
+      const key = [layout, cfg.labels, cfg.roundFont, cfg.showRatios, cfg.showBadge].join('|');
+      if (root.dataset.key !== key) {
+        // build the structure once per layout; later frames only update numbers,
+        // so the chart's CSS transitions can animate
+        root.dataset.key = key;
+        root.className = 'card judge' + (cfg.roundFont ? ' round' : '');
+        const label = (r) => (cfg.labels === 'numbers' ? r.num : r.word);
+        let html = '';
+        if (layout === 'compact') {
+          html = `<div class="judge-line">${JROWS.map((r) => `<span class="j-${r.k}" data-n="${r.k}">0</span>`).join('<span class="muted">/</span>')}</div>`;
+        } else {
+          if (layout === 'chart') {
+            html += '<svg class="jc-donut" viewBox="0 0 100 100" aria-hidden="true">' +
+              '<circle class="jc-track" cx="50" cy="50" r="37.5" pathLength="100"/>' +
+              '<g transform="rotate(-90 50 50)">' +
+              JROWS.map((r) => `<circle class="jc-seg" data-seg="${r.k}" cx="50" cy="50" r="37.5" pathLength="100" style="stroke:var(--c-${r.k})" stroke-dasharray="0 100"/>`).join('') +
+              '</g></svg>';
+          }
+          html += `<div class="jc-rows">${JROWS.map((r) => `<div class="jc-row"><span class="jc-l j-${r.k}">${label(r)}</span><span class="jc-n" data-n="${r.k}">0</span></div>`).join('')}</div>`;
+          html = `<div class="jc">${html}</div>`;
+        }
+        if (cfg.showRatios || cfg.showBadge) {
+          html += `<div class="judge-foot">${cfg.showRatios ? '<span data-ratio></span>' : '<span></span>'}${cfg.showBadge ? '<span class="badge" data-badge></span>' : ''}</div>`;
+        }
+        root.innerHTML = html;
       }
-      const ratio = (a, b) => (b ? (a / b).toFixed(2) + ':1' : a ? '∞' : '—');
-      const total = h.max + h[300] + h[200] + h[100] + h[50] + h.miss;
-      let badge = '', cls = '';
-      if (total > 0 && h.miss === 0) {
-        if (h[300] + h[200] + h[100] + h[50] === 0) { badge = 'MA'; cls = 'ma'; }
-        else if (h[200] + h[100] + h[50] === 0) { badge = 'PFC'; cls = 'pfc'; }
-        else { badge = 'FC'; cls = 'fc'; }
+      for (const r of JROWS) {
+        const n = root.querySelector(`[data-n="${r.k}"]`);
+        if (n && n.textContent !== String(h[r.k])) n.textContent = h[r.k];
       }
-      if (cfg.showRatios || cfg.showBadge) {
-        html += `<div class="judge-foot">${cfg.showRatios ? `<span>MA ${ratio(h.max, h[300])} · PA ${ratio(h[300], h[200])}</span>` : '<span></span>'}` +
-          `${cfg.showBadge ? `<span class="badge ${cls}">${badge}</span>` : ''}</div>`;
+      const total = JROWS.reduce((a, r) => a + h[r.k], 0);
+      let start = 0;
+      for (const r of JROWS) {
+        const seg = root.querySelector(`[data-seg="${r.k}"]`);
+        if (!seg) break;
+        const part = total ? (h[r.k] / total) * 100 : 0;
+        seg.setAttribute('stroke-dasharray', `${part.toFixed(3)} ${(100 - part).toFixed(3)}`);
+        seg.setAttribute('stroke-dashoffset', (-start).toFixed(3));
+        start += part;
       }
-      root.className = 'card';
-      root.innerHTML = html;
+      const ratioEl = root.querySelector('[data-ratio]');
+      if (ratioEl) {
+        const ratio = (a, b) => (b ? (a / b).toFixed(2) + ':1' : a ? '∞' : '—');
+        ratioEl.textContent = `MA ${ratio(h.max, h[300])} · PA ${ratio(h[300], h[200])}`;
+      }
+      const badgeEl = root.querySelector('[data-badge]');
+      if (badgeEl) {
+        let badge = '', cls = '';
+        if (total > 0 && h.miss === 0) {
+          if (h[300] + h[200] + h[100] + h[50] === 0) { badge = 'MA'; cls = 'ma'; }
+          else if (h[200] + h[100] + h[50] === 0) { badge = 'PFC'; cls = 'pfc'; }
+          else { badge = 'FC'; cls = 'fc'; }
+        }
+        badgeEl.textContent = badge;
+        badgeEl.className = 'badge ' + cls;
+      }
     },
   },
 
@@ -175,10 +223,19 @@ const WIDGETS = {
 
   ur: {
     label: 'UR / hit error',
+    // Slim, see-through hit error bar: white ticks that fade with age, a centre
+    // line, an arrow for the average, and early / late counts underneath.
     options: [
-      { key: 'showBar', type: 'bool', label: 'Hit error bar' },
-      { key: 'barWidth', type: 'range', label: 'Bar width', min: 150, max: 900, step: 10 },
-      { key: 'barHistory', type: 'range', label: 'Ticks shown', min: 10, max: 120, step: 5 },
+      { key: 'showUr', type: 'bool', label: 'UR number' },
+      { key: 'showEarlyLate', type: 'bool', label: 'Early / late counts' },
+      { key: 'barWidth', type: 'range', label: 'Bar width', min: 60, max: 600, step: 10 },
+      { key: 'barRange', type: 'select', label: 'Bar edges at',
+        choices: [['300', '300 window (tight)'], ['200', '200 window'], ['100', '100 window'], ['50', '50 window (widest)']] },
+      { key: 'barHistory', type: 'range', label: 'Ticks shown', min: 5, max: 120, step: 5 },
+      { key: 'colorTicks', type: 'bool', label: 'Colour ticks by judgement' },
+      { key: 'showZones', type: 'bool', label: 'Judgement zones behind ticks' },
+      { key: 'panel', type: 'bool', label: 'Background panel' },
+      { key: 'centerColor', type: 'color', label: 'Centre line colour' },
     ],
     render(root, cfg, d) {
       const errs = edit && !live.hitErrors.length ? demoErrors() : live.hitErrors;
@@ -187,25 +244,38 @@ const WIDGETS = {
         const mean = errs.reduce((a, b) => a + b, 0) / errs.length;
         ur = Math.sqrt(errs.reduce((a, b) => a + (b - mean) ** 2, 0) / errs.length) * 10;
       }
-      const w = cfg.barWidth | 0;
-      let html = `<div class="ur-num"><span>UR</span>${num(ur, 2)}</div>`;
-      if (cfg.showBar) {
-        const od = +(d.beatmap?.stats?.od?.converted ?? d.beatmap?.stats?.od?.original ?? 8);
-        const win = odWindows(od);
-        const range = win[50];
-        const x = (ms) => Math.max(0, Math.min(w, w / 2 + (ms / range) * (w / 2)));
-        const zones = [[50, 'var(--c-50)'], [100, 'var(--c-100)'], [200, 'var(--c-200)'], [300, 'var(--c-300)'], ['max', 'var(--c-max)']]
-          .map(([k, c]) => `<div class="zone" style="left:${x(-win[k])}px;width:${x(win[k]) - x(-win[k])}px;background:${c}"></div>`).join('');
-        const recent = errs.slice(-(cfg.barHistory | 0));
-        const ticks = recent.map((e, i) => {
-          const a = Math.abs(e);
-          const c = a <= win.max ? 'var(--c-max)' : a <= win[300] ? 'var(--c-300)' : a <= win[200] ? 'var(--c-200)' : a <= win[100] ? 'var(--c-100)' : 'var(--c-50)';
-          return `<div class="tick" style="left:${x(e)}px;background:${c};opacity:${(0.25 + 0.75 * (i + 1) / recent.length).toFixed(2)}"></div>`;
-        }).join('');
-        const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
-        html += `<div class="ur-bar" style="width:${w}px">${zones}<div class="mid"></div>${ticks}<div class="avg" style="left:${x(avg)}px"></div></div>`;
+      const w = Math.max(40, cfg.barWidth | 0);
+      const od = +(d.beatmap?.stats?.od?.converted ?? d.beatmap?.stats?.od?.original ?? 8);
+      const win = odWindows(od);
+      const range = win[cfg.barRange] || win[200];
+      const x = (ms) => Math.max(0, Math.min(w, w / 2 + (ms / range) * (w / 2)));
+      const recent = errs.slice(-Math.max(1, cfg.barHistory | 0));
+      const tickColor = (e) => {
+        if (!cfg.colorTicks) return '#fff';
+        const a = Math.abs(e);
+        return a <= win.max ? 'var(--c-max)' : a <= win[300] ? 'var(--c-300)' : a <= win[200] ? 'var(--c-200)' : a <= win[100] ? 'var(--c-100)' : 'var(--c-50)';
+      };
+      let html = cfg.showUr ? `<div class="ur2-num"><span>UR</span>${num(ur, 2)}</div>` : '';
+      let bar = '';
+      if (cfg.showZones) {
+        bar += [[50, 'var(--c-50)'], [100, 'var(--c-100)'], [200, 'var(--c-200)'], [300, 'var(--c-300)'], ['max', 'var(--c-max)']]
+          .map(([k, c]) => `<div class="ur2-zone" style="left:${x(-win[k])}px;width:${x(win[k]) - x(-win[k])}px;background:${c}"></div>`).join('');
       }
-      root.className = 'card';
+      bar += recent.map((e, i) => {
+        const age = (i + 1) / recent.length;          // 1 = newest
+        return `<div class="ur2-tick" style="left:${x(e).toFixed(1)}px;background:${tickColor(e)};opacity:${(0.12 + 0.78 * age * age).toFixed(2)}"></div>`;
+      }).join('');
+      const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
+      bar += `<div class="ur2-mid" style="background:${esc(cfg.centerColor || '#ff3b5c')}"></div>`;
+      bar += `<div class="ur2-avg" style="left:${x(avg).toFixed(1)}px"></div>`;
+      html += `<div class="ur2-bar" style="width:${w}px">${bar}</div>`;
+      if (cfg.showEarlyLate) {
+        // tosu's hitErrors are hit time minus note time: negative = early
+        let early = 0, late = 0;
+        for (const e of errs) { if (e < 0) early++; else if (e > 0) late++; }
+        html += `<div class="ur2-el" style="width:${w}px"><span title="early">${early}</span><span title="late">${late}</span></div>`;
+      }
+      root.className = 'ur2' + (cfg.panel ? ' card' : '');
       root.innerHTML = html;
     },
   },

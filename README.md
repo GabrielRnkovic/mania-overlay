@@ -4,9 +4,9 @@ An in-game overlay for **osu!mania** (osu! stable under Wine) on **Linux Wayland
 
 ![The rate changer over the overlay's widgets](docs/screenshot.png)
 
-- **Judgement counter**: MAX / 300 / 200 / 100 / 50 / Miss, MA and PA ratios, MA / PFC / FC badge
+- **Judgement counter**: a doughnut chart of your judgement split next to marv / perf / great / good / bad / miss counts, in the style of breadles5's [Mania Hit Count and Chart](https://github.com/breadles5/Mania-Hit-Count-and-Chart). Can also show counts only or one line, with optional MA / PA ratios and an MA / PFC / FC badge.
 - **PP**: live pp and FC pp while playing, SS pp in song select, final pp on the results screen
-- **UR** and a **hit error bar** coloured by the map's OD hit windows
+- **Hit error bar**: slim and see-through, with fading ticks, a centre line, an arrow for your average and **early / late counts** (can be turned off). It also shows UR, and judgement colours if you want them.
 - **Accuracy / combo** and **map info** (keys, stars, BPM, rate)
 - **MSD and dan estimates** from [ManiaMapAnalyser](https://github.com/LeoBlackMT/osumania_map_analyser) (MinaCalc MSD, skillsets, 4K/6K/7K RC/LN dans), drawn at full resolution at any size
 - **Rate changer**: makes a copy of the selected map at any rate from 0.5x to 2x, with or without pitch change, and can **change the map's OD** too (or only the OD)
@@ -150,6 +150,8 @@ In demo mode, F2 toggles the editor and F3 toggles the rate changer.
 - [tosu](https://github.com/tosuapp/tosu) reads osu!'s memory and serves the counters.
 - [ManiaMapAnalyser](https://github.com/LeoBlackMT/osumania_map_analyser) by Leo_Black provides the MSD and dan panel. It sends anonymous usage stats by default; you can turn that off in its settings (tosu dashboard → the counter → *Network*).
 - [gtk4-layer-shell](https://github.com/wmww/gtk4-layer-shell) puts the GTK window on the overlay layer.
+- The judgement counter's design (chart + coloured counts, colours) follows breadles5's [Mania Hit Count and Chart](https://github.com/breadles5/Mania-Hit-Count-and-Chart). It's a reimplementation; none of its code or files are included.
+- [Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License, `web/fonts/Nunito-OFL.txt`) is the rounded font. If you have Visby Round CF installed, which the original counter uses, it's used instead.
 
 Both tosu and ManiaMapAnalyser are downloaded from their own GitHub releases by the installer; neither is bundled here.
 

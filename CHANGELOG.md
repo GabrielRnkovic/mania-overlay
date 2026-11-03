@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- New judgement counter in the style of breadles5's Mania Hit Count and Chart: doughnut chart of the
+  judgement split next to marv / perf / great / good / bad / miss counts, with that counter's colours and a
+  rounded font. Layouts: chart + counts, counts only, one line. Ratios and badge are now optional (off).
+- New hit error bar: slim and see-through, fading white ticks, coloured centre line, average arrow and
+  early / late counts (toggle). Options for bar range, colouring ticks by judgement, zones and a panel.
+- Existing settings are migrated once: the old layouts switch to the new look, untouched default colours
+  and bar width are updated; positions and anything you customised are kept.
+
 ## 0.3.0
 
 - Fedora installer (`install.sh`) for KDE Plasma and niri. It installs system packages, tosu,
