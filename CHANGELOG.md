@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- Installer: if GitHub's API refuses (it allows 60 requests an hour per network), tosu and
+  ManiaMapAnalyser are found through the normal release page instead. Clearer error when GitHub
+  can't be reached, and no more misleading "stopped at line …" message. `GITHUB_TOKEN` is used if set.
+
 ## 0.4.0
 
 - New judgement counter in the style of breadles5's Mania Hit Count and Chart: doughnut chart of the

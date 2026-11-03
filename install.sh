@@ -324,25 +324,61 @@ install_app() {
   case ":$PATH:" in *":$BIN_DIR:"*) ;; *) warn "$BIN_DIR isn't on your PATH yet. Open a new terminal, or run the overlay as $BIN" ;; esac
 }
 
-# latest release asset URL: github_asset owner/repo mode -> "tag url"
-github_asset() {
-  local repo="$1" mode="$2" json
-  json="$(curl -fsSL -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$repo/releases/latest")" || return 1
-  python3 -c '
-import json, sys
-mode = sys.argv[1]
-rel = json.loads(sys.stdin.read())
-def wanted(name):
+# Which release file we want: "tosu" = the Linux tosu build, "analyser" = the plugin-only ManiaMapAnalyser zip.
+ASSET_FILTER='
+def wanted(name, mode):
     n = name.lower()
     if mode == "tosu":
         return "linux" in n and n.endswith((".zip", ".tar.gz", ".tgz", ".tar.xz"))
     return n.startswith("maniamapanalyser") and n.endswith(".zip") and "shell" not in n and "bridge" not in n
+'
+
+# Latest release asset: github_asset owner/repo mode -> prints "tag url".
+# Tries GitHub's API first; it allows only 60 requests an hour per network without a token,
+# so if that fails it reads the normal release web page instead. Set GITHUB_TOKEN to use a token.
+# Every failure here is handled with || so the ERR trap doesn't fire inside the subshell.
+github_asset() {
+  local repo="$1" mode="$2" json out final tag html
+  local auth=()
+  [[ -n ${GITHUB_TOKEN:-} ]] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  if json="$(curl -fsSL "${auth[@]}" -H 'Accept: application/vnd.github+json' \
+               "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null)"; then
+    if out="$(python3 -c "$ASSET_FILTER"'
+import json, sys
+rel = json.loads(sys.stdin.read())
 for a in rel.get("assets", []):
-    if wanted(a.get("name", "")):
-        print(rel.get("tag_name", "?"), a["browser_download_url"])
-        sys.exit(0)
+    if wanted(a.get("name", ""), sys.argv[1]):
+        print(rel.get("tag_name", "?"), a["browser_download_url"]); sys.exit(0)
 sys.exit(3)
-' "$mode" <<<"$json"
+' "$mode" <<<"$json" 2>/dev/null)"; then
+      echo "$out"; return 0
+    fi
+  fi
+  # fallback: github.com/<repo>/releases/latest redirects to .../releases/tag/<tag>,
+  # and .../releases/expanded_assets/<tag> lists the downloads
+  final="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest" 2>/dev/null)" || return 1
+  [[ $final == */releases/tag/* ]] || return 1
+  tag="${final##*/releases/tag/}"
+  html="$(curl -fsSL "https://github.com/$repo/releases/expanded_assets/$tag" 2>/dev/null)" || return 1
+  python3 -c "$ASSET_FILTER"'
+import re, sys
+mode, tag = sys.argv[1], sys.argv[2]
+for href in re.findall(r"href=\"(/[^\"]+/releases/download/[^\"]+)\"", sys.stdin.read()):
+    if wanted(href.rsplit("/", 1)[-1], mode):
+        print(tag, "https://github.com" + href); sys.exit(0)
+sys.exit(3)
+' "$mode" "$tag" <<<"$html" 2>/dev/null || return 1
+}
+
+# Say why a release lookup failed, for the error message.
+github_problem() {
+  local code
+  code="$(curl -s -o /dev/null -w '%{http_code}' -m 15 "https://github.com/$1/releases/latest" 2>/dev/null || true)"
+  case "$code" in
+    000|"") echo "this computer couldn't reach github.com (no internet, DNS, or a firewall/VPN blocking it)" ;;
+    429|403) echo "GitHub is rate-limiting your network right now; wait a few minutes and run the installer again" ;;
+    *) echo "GitHub answered, but the latest release has no file the installer recognises (HTTP $code)" ;;
+  esac
 }
 
 extract() { # extract archive into dir
@@ -402,7 +438,12 @@ install_tosu() {
   if [[ -n $TOSU_ARCHIVE ]]; then
     archive="$TOSU_ARCHIVE"; tag="(local file)"
   else
-    read -r tag url < <(github_asset "$TOSU_REPO" tosu) || die "couldn't find a Linux tosu release on github.com/$TOSU_REPO/releases. Download it yourself and rerun with --tosu-archive FILE."
+    local found=""
+    found="$(github_asset "$TOSU_REPO" tosu)" || found=""
+    [[ -n $found ]] || die "couldn't get the Linux tosu release: $(github_problem "$TOSU_REPO").
+       Or download the Linux .zip from https://github.com/$TOSU_REPO/releases/latest yourself and run:
+       ./install.sh --tosu-archive ~/Downloads/<the file>.zip"
+    read -r tag url <<<"$found"
     info "Downloading tosu $tag…"
     archive="$TMP/${url##*/}"
     curl -fsSL "$url" -o "$archive" || die "download failed: $url"
@@ -467,7 +508,12 @@ install_analyser() {
   if [[ -n $ANALYSER_ARCHIVE ]]; then
     archive="$ANALYSER_ARCHIVE"; tag="(local file)"
   else
-    read -r tag url < <(github_asset "$ANALYSER_REPO" analyser) || die "couldn't find the plugin-only ManiaMapAnalyser zip on github.com/$ANALYSER_REPO/releases. Download it yourself and rerun with --analyser-archive FILE."
+    local found=""
+    found="$(github_asset "$ANALYSER_REPO" analyser)" || found=""
+    [[ -n $found ]] || die "couldn't get ManiaMapAnalyser: $(github_problem "$ANALYSER_REPO").
+       Or download the zip without \"shell\" in its name from https://github.com/$ANALYSER_REPO/releases/latest and run:
+       ./install.sh --analyser-archive ~/Downloads/<the file>.zip"
+    read -r tag url <<<"$found"
     info "Downloading ManiaMapAnalyser $tag…"
     archive="$TMP/${url##*/}"
     curl -fsSL "$url" -o "$archive" || die "download failed: $url"
