@@ -75,6 +75,7 @@ Usage: install.sh [options]
 EOF
 }
 
+ORIG_ARGS=("$@")
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --desktop) OPT_DESKTOP="${2:-}"; shift 2 ;;
@@ -283,6 +284,37 @@ install_packages() {
   info "(sudo will ask for your password)"
   sudo dnf install -y "${missing[@]}" || die "dnf couldn't install the packages above."
   ok "installed"
+}
+
+# Run from a git clone that's behind GitHub? Offer to pull, then restart with the new installer.
+# (Otherwise re-running ./install.sh without `git pull` quietly reinstalls the old version.)
+self_update() {
+  [[ -n ${MANIA_UPDATED:-} ]] && return 0
+  local here behind
+  here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+  [[ -n $here && -d $here/.git && -f $here/install.sh ]] || return 0
+  command -v git >/dev/null || return 0
+  git -C "$here" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1 || return 0
+  if ! git -C "$here" fetch -q 2>/dev/null; then
+    warn "couldn't check GitHub for a newer version; installing what's in this folder."
+    return 0
+  fi
+  behind="$(git -C "$here" rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)"
+  [[ $behind =~ ^[0-9]+$ && $behind -gt 0 ]] || return 0
+  step "Update available"
+  info "This folder is $behind update(s) behind GitHub."
+  if ! ask "Download them first (git pull)?" y; then
+    warn "installing the older version that's in this folder."
+    return 0
+  fi
+  if ! git -C "$here" pull -q --ff-only; then
+    warn "git pull didn't work (changed files in this folder?). Installing the version that's here."
+    info "To get the update anyway: cd \"$here\" && git stash && git pull"
+    return 0
+  fi
+  ok "updated: $(git -C "$here" log -1 --format=%s | cut -c1-70)"
+  info "Restarting the installer with the new version…"
+  MANIA_UPDATED=1 exec bash "$here/install.sh" "${ORIG_ARGS[@]}"
 }
 
 get_source() {
@@ -823,6 +855,7 @@ EOF
 main() {
   if [[ $OPT_UNINSTALL == 1 ]]; then uninstall; exit 0; fi
   printf '%smania-overlay installer%s — Fedora · KDE Plasma / niri\n' "$C_B" "$C_0"
+  self_update
   load_state
   check_system
   choose_desktop

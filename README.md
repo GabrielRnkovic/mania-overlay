@@ -39,7 +39,7 @@ The installer asks whether you use **KDE Plasma** or **niri**, then sets up ever
 | Start on login | systemd user services `mania-overlay-tosu` and `mania-overlay`, started with your Plasma or niri session (if niri isn't run as a systemd session, `spawn-at-startup` lines in `mania-overlay.kdl` instead) |
 | Shortcuts | **KDE:** registers global shortcuts with Plasma (they show up in System Settings). **niri:** writes `~/.config/niri/mania-overlay.kdl` and adds one `include` line to your `config.kdl`. |
 
-You don't have to edit any config files. Re-run `./install.sh` any time to update; your layout and settings are kept, and it remembers your answers. `./install.sh --help` lists the options (`--desktop kde|niri`, `--yes`, `--no-tosu`, …).
+You don't have to edit any config files. Re-run `./install.sh` any time to update (from a clone it checks GitHub and offers to `git pull` first); your layout and settings are kept, and it remembers your answers. `./install.sh --help` lists the options (`--desktop kde|niri`, `--yes`, `--no-tosu`, …).
 
 **Already running tosu yourself?** Answer *no* to the tosu question, and keep starting yours as before.
 

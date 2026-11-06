@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3
+
+- Running `./install.sh` from a clone that's behind GitHub now offers to `git pull` first and restarts
+  itself with the new version, instead of quietly reinstalling the old one.
+
 ## 0.4.2
 
 - `mania-overlay doctor`: prints the overlay window's size and scale, the size the page lays out at,
