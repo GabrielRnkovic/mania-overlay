@@ -130,6 +130,7 @@ class OverlayApp(Gtk.Application):
         self.httpd = None
         self.monitor_list: list[dict] = []   # read by the HTTP thread, only replaced whole
         self.current_monitor = None          # connector we asked for ("" = compositor's choice)
+        self.desktop_xft_dpi = None          # GTK font DPI (x1024) before we pinned it
 
     # ------------------------------------------------------------------ setup
     def do_activate(self):
@@ -149,6 +150,8 @@ class OverlayApp(Gtk.Application):
                   "(is another instance running?)", file=sys.stderr)
             self.quit()
             return
+
+        self._pin_font_dpi()
 
         provider = Gtk.CssProvider()
         if hasattr(provider, "load_from_string"):  # GTK >= 4.12
@@ -191,6 +194,32 @@ class OverlayApp(Gtk.Application):
         win.present()
         print(f"[mania-overlay] running — page at http://127.0.0.1:{self.port}/", flush=True)
 
+    def _pin_font_dpi(self):
+        """Pin GTK's font DPI to 96 before any WebView exists.
+
+        WebKitGTK 2.54 turns the desktop's font DPI into a page zoom / devicePixelRatio
+        (120 DPI -> 1.25). The overlay needs CSS px == GTK px (the MSD panel is placed by
+        GTK pixel coordinates), and when the DPI arrives unset or as 0 — seen on KDE when
+        the overlay starts at login — WebKit gets devicePixelRatio 0, page zoom NaN and a
+        viewport of -2147483648 px, which squashes every widget into the top-left corner.
+        A value set by the application wins over XSETTINGS / the settings portal.
+        """
+        gs = Gtk.Settings.get_default()
+        if gs is None:
+            return
+        try:
+            self.desktop_xft_dpi = gs.get_property("gtk-xft-dpi")
+            gs.set_property("gtk-xft-dpi", 96 * 1024)
+        except TypeError:   # property missing on some GTK builds
+            self.desktop_xft_dpi = None
+
+    def _fix_broken_zoom(self, view) -> None:
+        """Safety net: reset a NaN / zero / negative page zoom to 1."""
+        z = view.get_zoom_level()
+        if not (z == z and z > 0):   # z == z is False for NaN
+            print(f"[mania-overlay] WebKit reported page zoom {z!r}; resetting it to 1.0", flush=True)
+            view.set_zoom_level(1.0)
+
     @staticmethod
     def _make_view() -> WebKit.WebView:
         view = WebKit.WebView()
@@ -212,6 +241,8 @@ class OverlayApp(Gtk.Application):
             "env": {k: os.environ.get(k, "") for k in ("XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "GDK_SCALE",
                                                        "GDK_DPI_SCALE", "QT_SCALE_FACTOR", "WEBKIT_DISABLE_DMABUF_RENDERER")},
             "visible": self.visible, "edit": self.edit, "menu": self.menu,
+            "fontDpi": {"desktop": self.desktop_xft_dpi, "now": (Gtk.Settings.get_default().get_property("gtk-xft-dpi")
+                                                             if Gtk.Settings.get_default() else None)},
             "monitorSetting": self.current_monitor,
             "window": [win.get_width(), win.get_height()] if win else None,
             "view": [view.get_width(), view.get_height()] if view else None,
@@ -326,11 +357,13 @@ class OverlayApp(Gtk.Application):
         av.set_visible(True)
         self.aspec = spec
 
-    def _on_page_load(self, _view, event):
+    def _on_page_load(self, view, event):
         # the page is (re)loading: hide the panel until the page places it again
         if event == WebKit.LoadEvent.STARTED and self.aview:
             self.aview.set_visible(False)
             self.aspec = {}
+        if event in (WebKit.LoadEvent.COMMITTED, WebKit.LoadEvent.FINISHED):
+            self._fix_broken_zoom(view)
 
     # ------------------------------------------------------------------ input
     def _on_realize(self, win):

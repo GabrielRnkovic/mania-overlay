@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.4
+
+- Fix everything being tiny and squashed into the top-left corner with WebKitGTK 2.54 (Fedora 44).
+  WebKitGTK 2.54 turns the desktop's font DPI into page zoom; when the DPI reaches the overlay unset
+  (seen on KDE at login), WebKit ends up with devicePixelRatio 0, zoom NaN and a negative viewport.
+  The overlay now pins its own font DPI to 96 and resets a broken page zoom to 1.
+- `mania-overlay doctor` shows the font DPI and flags devicePixelRatio 0 / NaN zoom.
+
 ## 0.4.3
 
 - Running `./install.sh` from a clone that's behind GitHub now offers to `git pull` first and restarts

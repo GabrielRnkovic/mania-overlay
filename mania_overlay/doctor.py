@@ -49,6 +49,9 @@ def report(port: int) -> int:
         print(f"  surface scale: {host.get('surfaceScale')} (integer factor {host.get('surfaceScaleFactor')})")
         print(f"  on monitor: {host.get('onMonitor')}")
         print(f"  monitor setting: {host.get('monitorSetting')!r}")
+        dpi = host.get("fontDpi") or {}
+        fmt = lambda v: f"{v / 1024:g}" if isinstance(v, (int, float)) and v > 0 else repr(v)
+        print(f"  font DPI: desktop {fmt(dpi.get('desktop'))}, overlay uses {fmt(dpi.get('now'))}")
         print(f"  page thinks: {page.get('innerWidth')}x{page.get('innerHeight')} CSS px, "
               f"devicePixelRatio {page.get('dpr')}, screen {page.get('screenWidth')}x{page.get('screenHeight')}, "
               f"visual zoom {page.get('visualScale')}")
@@ -69,7 +72,12 @@ def report(port: int) -> int:
         scale = host.get("surfaceScale") or mon.get("scale")
         if scale and scale < 1:
             problems.append(f"display scale is {scale} (below 100%), which many apps mishandle")
-        if host.get("viewZoom") and abs(host["viewZoom"] - 1) > 1e-3:
+        if page.get("dpr") == 0:
+            problems.append("the page reports devicePixelRatio 0 (WebKit got no usable scale / font DPI)")
+        z = host.get("viewZoom")
+        if isinstance(z, float) and z != z:
+            problems.append("page zoom is NaN")
+        elif host.get("viewZoom") and abs(host["viewZoom"] - 1) > 1e-3:
             problems.append(f"the page is zoomed to {host['viewZoom']}")
 
     if "KDE" in desktop.upper():
