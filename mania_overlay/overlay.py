@@ -14,7 +14,9 @@ what made it blurry. The page tells us where to put it via POST /api/analyser.
 from __future__ import annotations
 
 import json
+import os
 import sys
+import threading
 
 import gi
 
@@ -31,6 +33,13 @@ from .config import Settings  # noqa: E402
 from .server import Controller, start_server  # noqa: E402
 
 CSS = "window, window.background { background: transparent; }"
+
+
+def _layer_shell_version() -> str:
+    try:
+        return f"{LayerShell.get_major_version()}.{LayerShell.get_minor_version()}.{LayerShell.get_micro_version()}"
+    except AttributeError:
+        return "?"
 
 
 def idle(fn, *args):
@@ -85,6 +94,21 @@ class OverlayController(Controller):
     def analyser(self, spec: dict) -> dict:
         idle(self.app.set_analyser, spec)
         return {"ok": True}
+
+    def diagnostics(self) -> dict:
+        # GTK must be touched on its own thread: ask it and wait briefly
+        out: dict = {}
+        done = threading.Event()
+
+        def collect():
+            try:
+                out.update(self.app.diagnostics())
+            except Exception as e:  # never let a diagnostic crash the overlay
+                out["error"] = repr(e)
+            done.set()
+        idle(collect)
+        done.wait(3)
+        return out
 
 
 class OverlayApp(Gtk.Application):
@@ -175,6 +199,36 @@ class OverlayApp(Gtk.Application):
         view.set_background_color(clear)
         view.get_settings().set_enable_write_console_messages_to_stdout(True)
         return view
+
+    # ------------------------------------------------------------------ diagnostics
+    def diagnostics(self) -> dict:
+        self._refresh_monitor_list()
+        win, view = self.win, self.view
+        surface = win.get_surface() if win else None
+        d = {
+            "gtk": f"{Gtk.get_major_version()}.{Gtk.get_minor_version()}.{Gtk.get_micro_version()}",
+            "webkit": f"{WebKit.get_major_version()}.{WebKit.get_minor_version()}.{WebKit.get_micro_version()}",
+            "layerShell": _layer_shell_version(),
+            "env": {k: os.environ.get(k, "") for k in ("XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "GDK_SCALE",
+                                                       "GDK_DPI_SCALE", "QT_SCALE_FACTOR", "WEBKIT_DISABLE_DMABUF_RENDERER")},
+            "visible": self.visible, "edit": self.edit, "menu": self.menu,
+            "monitorSetting": self.current_monitor,
+            "window": [win.get_width(), win.get_height()] if win else None,
+            "view": [view.get_width(), view.get_height()] if view else None,
+            "viewZoom": view.get_zoom_level() if view else None,
+            "monitors": self.monitor_list,
+        }
+        if surface:
+            d["surfaceScaleFactor"] = surface.get_scale_factor()
+            if hasattr(surface, "get_scale"):
+                d["surfaceScale"] = round(surface.get_scale(), 4)   # fractional scale, GTK >= 4.12
+            mon = Gdk.Display.get_default().get_monitor_at_surface(surface)
+            if mon:
+                g = mon.get_geometry()
+                d["onMonitor"] = {"connector": mon.get_connector(), "x": g.x, "y": g.y,
+                                  "width": g.width, "height": g.height, "scaleFactor": mon.get_scale_factor(),
+                                  "scale": round(mon.get_scale(), 4) if hasattr(mon, "get_scale") else None}
+        return d
 
     # ------------------------------------------------------------------ monitors
     def _refresh_monitor_list(self):

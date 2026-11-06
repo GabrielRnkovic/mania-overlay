@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2
+
+- `mania-overlay doctor`: prints the overlay window's size and scale, the size the page lays out at,
+  monitors, versions and `kscreen-doctor -o` / `niri msg outputs`, and points out mismatches. For bug
+  reports about the overlay being too small, squashed or on the wrong screen.
+
 ## 0.4.1
 
 - Installer: if GitHub's API refuses (it allows 60 requests an hour per network), tosu and

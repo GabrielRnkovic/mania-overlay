@@ -3,6 +3,7 @@
   mania-overlay                 start the overlay (same as `run`)
   mania-overlay edit            toggle edit mode (move widgets, settings, rate changer)
   mania-overlay rate-menu       open / close the rate picker (any rate 0.5x-2x)
+  mania-overlay doctor          print sizes, scales and versions for a bug report
   mania-overlay toggle          show / hide the overlay
   mania-overlay rate 1.1 1.2    make rate-changed copies of the current map
   mania-overlay rate 1 --od 8   OD-only copy (any rate can take --od)
@@ -55,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--demo", action="store_true", help="fake gameplay data, for testing without osu!/tosu")
     for name in ("edit", "rate-menu", "toggle", "show", "hide", "reload", "quit"):
         sub.add_parser(name)
+    sub.add_parser("doctor", help="print sizes, scales and versions for bug reports")
     rate_p = sub.add_parser("rate", help="rate-change the map selected in osu!")
     rate_p.add_argument("rates", nargs="+", type=float)
     rate_p.add_argument("--pitch", action="store_true", default=None, help="change pitch (nightcore style)")
@@ -75,6 +77,10 @@ def main(argv: list[str] | None = None) -> int:
         from . import overlay
         return overlay.run(Settings(), args.port, inspect=getattr(args, "inspect", False),
                            demo=getattr(args, "demo", False))
+
+    if cmd == "doctor":
+        from .doctor import report
+        return report(args.port)
 
     if cmd == "rate-file":
         from .ratechanger import RateError, make_rate

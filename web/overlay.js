@@ -1097,4 +1097,15 @@ async function boot() {
 }
 
 window.overlay = { setEditMode, setMenuMode, toast, reloadSettings: async () => { S = await api('/api/settings'); applyTheme(); buildPanel(); scheduleRender(); } };
-boot();
+// Report the page's own idea of its size, for `mania-overlay doctor`.
+function reportClientInfo() {
+  api('/api/client-info', {
+    innerWidth: window.innerWidth, innerHeight: window.innerHeight,
+    dpr: window.devicePixelRatio, screenWidth: screen.width, screenHeight: screen.height,
+    visualScale: window.visualViewport ? +window.visualViewport.scale.toFixed(3) : null,
+  }).catch(() => {});
+}
+let clientInfoTimer = null;
+window.addEventListener('resize', () => { clearTimeout(clientInfoTimer); clientInfoTimer = setTimeout(reportClientInfo, 300); });
+
+boot().then(reportClientInfo);

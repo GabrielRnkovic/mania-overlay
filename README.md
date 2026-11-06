@@ -126,6 +126,7 @@ This stops and removes the services, the shortcuts (including the niri `include`
 ## Troubleshooting
 
 - **Logs**: `journalctl --user -u mania-overlay -u mania-overlay-tosu`, or stop the service (`systemctl --user stop mania-overlay`) and run `mania-overlay` in a terminal.
+- **Everything is tiny, squashed or in the wrong place**: run `mania-overlay doctor` and include its output when you report it. It shows the sizes and scales the overlay sees. Display scales below 100% in KDE's display settings are a known cause of apps getting their size wrong.
 - **Nothing shows over osu!**: open the editor (Meta/Mod+Alt+O) and check the bottom-left corner says *tosu connected*. If it doesn't, check http://127.0.0.1:24050 in a browser.
 - **The overlay is on the wrong screen**: *Editor → General → Monitor*.
 - **A shortcut does nothing**: the key may already be in use. On KDE, pick another key in System Settings → Shortcuts → mania-overlay; on KDE 6.0 or older, new shortcuts only work after logging out and back in. On niri, check `niri validate` and `~/.config/niri/mania-overlay.kdl`.

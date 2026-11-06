@@ -29,6 +29,9 @@ from .config import Settings
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 
+CLIENT_INFO: dict = {}   # last size report from the page
+
+
 class Controller:
     """What the HTTP API can ask the overlay window to do. The GTK host overrides this."""
 
@@ -41,6 +44,10 @@ class Controller:
 
     def monitors(self) -> list:
         return []
+
+    def diagnostics(self) -> dict:
+        """Window / monitor / toolkit facts for `mania-overlay doctor` (GTK host only)."""
+        return {}
 
     def analyser(self, spec: dict) -> dict:
         return {"ok": False, "error": "no native host"}
@@ -145,6 +152,10 @@ def make_handler(settings: Settings, controller: Controller):
                 })
             if route == "/api/monitors":
                 return self._json({"monitors": controller.monitors()})
+            if route == "/api/doctor":
+                from . import __version__
+                return self._json({"version": __version__, "host": controller.diagnostics(),
+                                   "page": CLIENT_INFO, "edit": controller.edit_mode})
             if route == "/api/current-map":
                 s = settings.get()
                 try:
@@ -168,6 +179,12 @@ def make_handler(settings: Settings, controller: Controller):
                 data = settings.reset()
                 controller.settings_changed()
                 return self._json(data)
+            if route == "/api/client-info":
+                # the page reports its own idea of its size, for `mania-overlay doctor`
+                if isinstance(body, dict):
+                    CLIENT_INFO.clear()
+                    CLIENT_INFO.update({k: body[k] for k in list(body)[:20]})
+                return self._json({"ok": True})
             if route == "/api/analyser":
                 return self._json(controller.analyser(body if isinstance(body, dict) else {}))
             if route == "/api/control":
